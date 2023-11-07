@@ -22,7 +22,7 @@ func NewKafkaProducer(topic string) (DataProducer, error) {
 	if err != nil {
 		return nil, err
 	}
-	// start message broker in a separate goroutine
+	// start topic in a separate goroutine
 	go func() {
 		for e := range p.Events() {
 			switch ev := e.(type) {
