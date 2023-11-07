@@ -19,9 +19,8 @@ func main() {
 }
 
 type DataReceiver struct {
-	msgch chan types.OBUData
-	conn  *websocket.Conn
-	prod  DataProducer
+	conn *websocket.Conn
+	prod DataProducer
 }
 
 func NewDataReceiver() (*DataReceiver, error) {
@@ -36,8 +35,7 @@ func NewDataReceiver() (*DataReceiver, error) {
 	}
 	p = NewLogMiddleware(p)
 	return &DataReceiver{
-		msgch: make(chan types.OBUData, 128),
-		prod:  p,
+		prod: p,
 	}, nil
 }
 
