@@ -1,6 +1,9 @@
 package main
 
-import "github.com/GrigoryNazarov96/toll-calculator/types"
+import (
+	"github.com/GrigoryNazarov96/toll-calculator/types"
+	"github.com/sirupsen/logrus"
+)
 
 const basePrice = 3.15
 
@@ -25,6 +28,11 @@ func NewDistanceAggregator(s Storer) Aggregator {
 }
 
 func (a *DistanceAggregator) AggregateTelemetryData(data types.TelemetryData) error {
+	logrus.WithFields(logrus.Fields{
+		"obuID":    data.OBUID,
+		"distance": data.Distance,
+		"unix":     data.Unix,
+	}).Info("aggregating distance per OBU")
 	return a.store.Insert(data)
 }
 

@@ -4,18 +4,24 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/GrigoryNazarov96/toll-calculator/types"
 	"github.com/gorilla/websocket"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Fatal("failed to load env file")
+	}
+	port := os.Getenv("ws_port")
 	dr, err := NewDataReceiver()
 	if err != nil {
 		log.Fatal(err)
 	}
 	http.HandleFunc("/ws", dr.handleWS)
-	http.ListenAndServe(":30000", nil)
+	http.ListenAndServe(port, nil)
 }
 
 type DataReceiver struct {

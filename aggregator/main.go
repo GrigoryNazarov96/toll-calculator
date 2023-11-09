@@ -3,62 +3,56 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
+	"net"
 	"net/http"
-	"strconv"
+	"os"
 
 	"github.com/GrigoryNazarov96/toll-calculator/types"
+	"github.com/joho/godotenv"
+	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"google.golang.org/grpc"
 )
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Fatal("unable to load env file")
+	}
 	var (
-		port  = ":4020"
-		store = NewInMemoryStore()
-		a     = NewDistanceAggregator(store)
+		httpPort = os.Getenv("agg_http_port")
+		grpcPort = os.Getenv("agg_grpc_port")
+		store    = NewInMemoryStore()
+		a        = NewDistanceAggregator(store)
 	)
+	a = NewMetricsMiddleware(a)
 	a = NewLogMiddleware(a)
-	makeHTTPTransport(port, a)
+	go makeGRPCtransport(grpcPort, a)
+	makeHTTPTransport(httpPort, a)
+}
+
+func makeGRPCtransport(port string, a Aggregator) error {
+	fmt.Println("GRPC transport is ready to handle requests on port ", port)
+	ln, err := net.Listen("tcp", port)
+	if err != nil {
+		return err
+	}
+	defer ln.Close()
+	server := grpc.NewServer([]grpc.ServerOption{}...)
+	types.RegisterAggregatorServer(server, NewGRPCServer(a))
+	return server.Serve(ln)
 }
 
 func makeHTTPTransport(port string, a Aggregator) {
-	fmt.Println("HTTP transport is ready to handle requests on port ", port)
-	http.HandleFunc("/aggregate", handleAggregate(a))
-	http.HandleFunc("/invoice", handleGetInvoice(a))
+	var (
+		aggmh            = NewHTTPMetricHandler("aggregator")
+		invmh            = NewHTTPMetricHandler("invoice")
+		aggregateHandler = makeHTTPHandlerFunc(aggmh.instrument(handleAggregate(a)))
+		invoiceHandler   = makeHTTPHandlerFunc(invmh.instrument(handleGetInvoice(a)))
+	)
+	http.HandleFunc("/aggregate", aggregateHandler)
+	http.HandleFunc("/invoice", invoiceHandler)
+	http.Handle("/metrics", promhttp.Handler())
 	http.ListenAndServe(port, nil)
-}
-
-func handleAggregate(a Aggregator) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		var td types.TelemetryData
-		if err := json.NewDecoder(r.Body).Decode(&td); err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": err.Error()})
-			return
-		}
-		if err := a.AggregateTelemetryData(td); err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-			return
-		}
-	}
-}
-
-func handleGetInvoice(a Aggregator) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		values, ok := r.URL.Query()["id"]
-		if !ok {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "missing OBU id"})
-			return
-		}
-		obuID, err := strconv.Atoi(values[0])
-		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": "incorrect OBU id"})
-			return
-		}
-		invoice, err := a.GetInvoice(obuID)
-		if err != nil {
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"error": err.Error()})
-			return
-		}
-		writeJSON(w, http.StatusOK, invoice)
-	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) error {

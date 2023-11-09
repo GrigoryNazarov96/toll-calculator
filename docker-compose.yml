@@ -6,7 +6,9 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
-
+    networks:
+      - tollcalc
+  
   broker:
     image: confluentinc/cp-kafka:7.3.2
     container_name: broker
@@ -22,3 +24,38 @@ services:
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+    networks:
+      - tollcalc
+  
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    ports: 
+      - "9090:9090"
+    volumes:
+      - ./.config/prometheus.yml:/etc/prometheus/prometheus.yml
+    depends_on:
+      - broker
+    networks:
+      - tollcalc
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports: 
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    environment:
+      - GF_SECURITY_ALLOW_EMBEDDING=true
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_NAME=Main Org.
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_AUTH_OAUTH_AUTO_LOGIN=true
+    networks:
+      - tollcalc
+
+networks:
+  tollcalc:
+    driver: bridge 

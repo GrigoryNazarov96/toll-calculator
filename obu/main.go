@@ -2,17 +2,17 @@ package main
 
 import (
 	"log"
-	"math"
 	"math/rand"
+	"os"
 	"time"
 
 	"github.com/GrigoryNazarov96/toll-calculator/types"
 	"github.com/gorilla/websocket"
+	"github.com/joho/godotenv"
 )
 
 const (
-	interval   = time.Second * 5
-	wsEndpoint = "ws://localhost:30000/ws"
+	interval = time.Second * 5
 )
 
 func genCoordinates() float64 {
@@ -28,7 +28,7 @@ func genLoc() (float64, float64) {
 func genOBUID(n int) []int {
 	ids := make([]int, n)
 	for i := range ids {
-		ids[i] = rand.Intn(math.MaxInt)
+		ids[i] = int(rand.Intn(2799999999999999999))
 	}
 	return ids
 }
@@ -38,6 +38,10 @@ func sendOBUData(conn *websocket.Conn, data types.OBUData) error {
 }
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Fatal("failed to load the env file")
+	}
+	wsEndpoint := os.Getenv("ws_endpoint")
 	OBUIDs := genOBUID(20)
 	conn, _, err := websocket.DefaultDialer.Dial(wsEndpoint, nil)
 	if err != nil {

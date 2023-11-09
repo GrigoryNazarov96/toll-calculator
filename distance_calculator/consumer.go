@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"time"
 
@@ -14,10 +15,10 @@ type KafkaConsumer struct {
 	consumer    *kafka.Consumer
 	isRunning   bool
 	calcService Calculator
-	aggClient   *client.Client
+	client      client.Client
 }
 
-func NewKafkaConsumer(topic string, s Calculator, cl *client.Client) (*KafkaConsumer, error) {
+func NewKafkaConsumer(topic string, s Calculator, cl client.Client) (*KafkaConsumer, error) {
 	c, err := kafka.NewConsumer(&kafka.ConfigMap{
 		"bootstrap.servers": "localhost",
 		"group.id":          "myGroup",
@@ -30,7 +31,7 @@ func NewKafkaConsumer(topic string, s Calculator, cl *client.Client) (*KafkaCons
 	return &KafkaConsumer{
 		consumer:    c,
 		calcService: s,
-		aggClient:   cl,
+		client:      cl,
 	}, nil
 }
 
@@ -38,6 +39,10 @@ func (c *KafkaConsumer) Start() {
 	logrus.Info("kafka consumer started")
 	c.isRunning = true
 	c.readMessageLoop()
+}
+
+func (c *KafkaConsumer) Close() {
+	c.isRunning = false
 }
 
 func (c *KafkaConsumer) readMessageLoop() {
@@ -53,12 +58,12 @@ func (c *KafkaConsumer) readMessageLoop() {
 			continue
 		}
 		distance := c.calcService.CalculateDistance(data)
-		telemetryData := types.TelemetryData{
+		telemetryData := &types.TelemetryDataRequest{
 			Distance: distance,
-			OBUID:    data.OBUID,
+			ObuID:    int32(data.OBUID),
 			Unix:     time.Now().Unix(),
 		}
-		if err := c.aggClient.AggregateInvoice(telemetryData); err != nil {
+		if err := c.client.Aggregate(context.Background(), telemetryData); err != nil {
 			logrus.Errorf("aggregate error: %s", err)
 			continue
 		}

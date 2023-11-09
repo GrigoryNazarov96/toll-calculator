@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+option go_package = "github.com/GrigoryNazarov96/toll-calculator/types";
+
+service Aggregator {
+  rpc Aggregate(TelemetryDataRequest) returns (None);
+}
+
+message None {};
+
+message GetInvoiceRequest {
+  int32 ObuID = 1;
+}
+
+message TelemetryDataRequest {
+  int32 ObuID = 1;
+  double Distance = 2;
+  int64 Unix = 3;
+} 
